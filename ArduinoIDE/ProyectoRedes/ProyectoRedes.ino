@@ -1,53 +1,93 @@
+#include <WiFi.h>
+#include <ESPmDNS.h>
+#include <WebSocketsServer.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
-#include <math.h> // Para calcular el ángulo
+#include <math.h>
 
+const char* ssid = "TIGO-A9C7";
+const char* password = "tigo2019";
+
+WebSocketsServer webSocket = WebSocketsServer(81);
 Adafruit_MPU6050 mpu;
 
-const int PIN_MOTOR = 18;       // Pin donde conectas el IN del motor
-const int UMBRAL_ANGULO = 25;    // Grados de inclinación para activar vibración
+const int PIN_MOTOR = 18;
+const int UMBRAL_ANGULO = 25;
 
-void setup(void) {
-  Serial.begin(115200);
-  pinMode(PIN_MOTOR, OUTPUT);
-  digitalWrite(PIN_MOTOR, LOW); // Motor apagado al inicio
+float inclinacion = 0;
 
-  Wire.begin();
-  // Velocidad ultra lenta para jumpers inestables
-  Wire.setClock(10000); 
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
 
-  if (!mpu.begin()) {
-    Serial.println("No se encontro el MPU6050. ¡Revisa los cables!");
-    while (1) { delay(10); }
+  if(type == WStype_CONNECTED) {
+    Serial.println("Client connected");
   }
 
-  Serial.println("Corrector de Postura Iniciado...");
+  if(type == WStype_DISCONNECTED) {
+    Serial.println("Client disconnected");
+  }
+}
+
+void setup() {
+
+  Serial.begin(115200);
+  pinMode(PIN_MOTOR, OUTPUT);
+
+  Wire.begin();
+  Wire.setClock(10000);
+
+  if (!mpu.begin()) {
+    Serial.println("MPU6050 error");
+    while (1) delay(10);
+  }
+
+  WiFi.begin(ssid, password);
+
+  Serial.print("Connecting");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println();
+  Serial.print("ESP32 IP: ");
+  Serial.println(WiFi.localIP());
+
+  // Start mDNS AFTER WiFi
+  if (!MDNS.begin("posturefix")) {
+    Serial.println("Error starting mDNS");
+  } else {
+    Serial.println("mDNS started: posturefix.local");
+  }
+  Serial.println("WebSocket server started on port 81");
+  webSocket.begin();
+  webSocket.onEvent(webSocketEvent);
 }
 
 void loop() {
+
+  webSocket.loop();
+
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
-  /* CALCULO DE INCLINACIÓN */
-  // Usamos el eje Y y Z para calcular el ángulo en grados
-  // La fórmula es: Angulo = atan2(y, z) * 180 / PI
-  float inclinacion = atan2(a.acceleration.y, a.acceleration.z) * 180 / M_PI;
+  inclinacion = atan2(a.acceleration.y, a.acceleration.z) * 180 / M_PI;
 
-  Serial.print("Inclinacion: ");
-  Serial.print(inclinacion);
-  Serial.println(" °");
-
-  /* LÓGICA DEL MOTOR */
-  // Si la inclinación es mayor al umbral, ¡VIBRA!
-  // Usamos abs() por si el sensor está invertido
   if (abs(inclinacion) > UMBRAL_ANGULO) {
-    digitalWrite(PIN_MOTOR, HIGH); 
-    Serial.println("¡ENDERÉZATE! (Motor ON)");
+    digitalWrite(PIN_MOTOR, HIGH);
   } else {
     digitalWrite(PIN_MOTOR, LOW);
-    Serial.println("Buena postura (Motor OFF)");
   }
 
-  delay(300); // Pequeña pausa para no saturar el monitor
+  String data = "{";
+  data += "\"angle\":";
+  data += inclinacion;
+  data += ",\"bad_posture\":";
+  data += abs(inclinacion) > UMBRAL_ANGULO ? "true" : "false";
+  data += "}";
+
+  webSocket.broadcastTXT(data);
+
+  delay(300);
 }
