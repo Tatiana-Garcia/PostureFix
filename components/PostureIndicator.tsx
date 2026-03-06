@@ -67,7 +67,7 @@ export const PostureIndicator: React.FC<Props> = ({
       </Text>
 
       <Text variant="headlineSmall" style={styles.angle}>
-        {angle}°
+        {angle.toFixed(1)}°
       </Text>
     </View>
   );

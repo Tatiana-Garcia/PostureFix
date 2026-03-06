@@ -7,9 +7,10 @@ interface Props {
   encorvadoSeconds: number;
 }
 
-function formatMinutes(seconds: number) {
-  const mins = Math.floor(Math.max(0, seconds) / 60);
-  return `${mins} min`;
+function formatTime(seconds: number) {
+  const m = Math.floor(Math.max(0, seconds) / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 export const ModeSelector: React.FC<Props> = ({
@@ -19,12 +20,12 @@ export const ModeSelector: React.FC<Props> = ({
   return (
     <View style={styles.container}>
       <View style={[styles.pill, styles.goodPill]}>
-        <Text style={styles.minutes}>{formatMinutes(rectoSeconds)}</Text>
+        <Text style={styles.minutes}>{formatTime(rectoSeconds)}</Text>
         <Text style={styles.label}>Recto</Text>
       </View>
 
       <View style={[styles.pill, styles.badPill]}>
-        <Text style={styles.minutes}>{formatMinutes(encorvadoSeconds)}</Text>
+        <Text style={styles.minutes}>{formatTime(encorvadoSeconds)}</Text>
         <Text style={styles.label}>Encorvado</Text>
       </View>
     </View>
