@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { StyleSheet, View, ScrollView } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { Button, Text } from "react-native-paper";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-  Easing,
 } from "react-native-reanimated";
 
 export default function Settings() {
@@ -62,7 +62,7 @@ export default function Settings() {
               mode="contained"
               onPress={handleCalibrate}
               disabled={isCalibrated}
-              buttonColor={isCalibrated ? "#81c784" : "#6750a4"}
+              buttonColor={isCalibrated ? "#81c784" : "#2196F3"}
               style={styles.button}
               labelStyle={styles.buttonLabel}
             >

@@ -1,7 +1,7 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import { Button } from "react-native-paper";
-import { HelpSection } from "../../components/HelpSection";
+import { Button, Card, Text } from "react-native-paper";
 import { ModeSelector } from "../../components/ModeSelector";
 import { PostureIndicator } from "../../components/PostureIndicator";
 import { TimerPill } from "../../components/TimerPill";
@@ -14,8 +14,8 @@ export default function Index() {
   const [encorvadoSeconds, setEncorvadoSeconds] = React.useState(0);
 
   const [angle, setAngle] = React.useState(0);
+  const [isBadPosture, setIsBadPosture] = React.useState(false);
   const [isConnected, setIsConnected] = React.useState(false);
-  const isBadPosture = angle > 20;
 
   React.useEffect(() => {
   const ws = new WebSocket("ws://10.179.4.102:81");
@@ -29,6 +29,7 @@ export default function Index() {
     try {
       const data = JSON.parse(event.data);
       if (typeof data.angle === "number") setAngle(data.angle);
+      if (typeof data.bad_posture === "boolean") setIsBadPosture(data.bad_posture);
     } catch (err) {
       console.error("Failed to parse WebSocket message:", event.data);
     }
@@ -79,28 +80,66 @@ export default function Index() {
   };
 
   return (
-    
-
     <View style={styles.container}>
-      <View style={styles.section}>
-        <ModeSelector
-          rectoSeconds={rectoSeconds}
-          encorvadoSeconds={encorvadoSeconds}
-        />
+      {/* Header Section */}
+      <View style={styles.header}>
+        <View style={styles.titleContainer}>
+          <Text variant="headlineLarge" style={styles.title}>
+            PostureFix
+          </Text>
+          <Text variant="bodySmall" style={styles.subtitle}>
+            Monitorea tu postura en tiempo real
+          </Text>
+        </View>
+        <View style={[styles.statusBadge, isConnected && styles.statusConnected]}>
+          <MaterialCommunityIcons 
+            name={isConnected ? "wifi" : "wifi-off"} 
+            size={14} 
+            color={isConnected ? "#2196F3" : "#999"} 
+          />
+          <Text style={[styles.statusText, isConnected && styles.statusTextConnected]}>
+            {isConnected ? "Conectado" : "Desconectado"}
+          </Text>
+        </View>
       </View>
-      <View style={styles.section}>
-        <PostureIndicator angle={angle} isBadPosture={isBadPosture} />
-      </View>
-      <View style={styles.section}>
-        <TimerPill elapsedSeconds={elapsedSeconds} isRunning={isRunning} />
-      </View>
-      <View style={styles.section}>
-        <Button mode="contained" style={styles.button} onPress={onToggleSession}>
+
+      {/* Stats Cards */}
+      <Card style={styles.card} mode="elevated" elevation={2}>
+        <Card.Content style={styles.cardContent}>
+          <ModeSelector
+            rectoSeconds={rectoSeconds}
+            encorvadoSeconds={encorvadoSeconds}
+          />
+        </Card.Content>
+      </Card>
+
+      {/* Posture Indicator */}
+      <Card style={styles.card} mode="elevated" elevation={2}>
+        <Card.Content style={styles.cardContent}>
+          <PostureIndicator angle={angle} isBadPosture={isBadPosture} />
+        </Card.Content>
+      </Card>
+
+      {/* Timer Card */}
+      <Card style={styles.card} mode="elevated" elevation={2}>
+        <Card.Content style={styles.cardContent}>
+          <TimerPill elapsedSeconds={elapsedSeconds} isRunning={isRunning} />
+        </Card.Content>
+      </Card>
+
+      {/* Action Button */}
+      <View style={styles.buttonContainer}>
+        <Button 
+          mode="contained" 
+          style={styles.button} 
+          buttonColor="#2196F3"
+          contentStyle={styles.buttonContent}
+          labelStyle={styles.buttonLabel}
+          onPress={onToggleSession}
+          icon={isRunning ? "stop" : "play"}
+        >
           {isRunning ? "Terminar sesión" : "Empezar sesión"}
         </Button>
-      </View>
-      <View style={styles.section}>
-        <HelpSection />
       </View>
     </View>
   );
@@ -109,27 +148,77 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: "#f4f1f6",
+    backgroundColor: "#f5f5f7",
+    padding: 12,
+    paddingTop: 16,
   },
-  section: {
-    marginBottom: 24,
+  header: {
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  titleContainer: {
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  title: {
+    fontWeight: "800",
+    color: "#1a1a1a",
+    letterSpacing: -0.5,
+    marginBottom: 2,
+  },
+  subtitle: {
+    color: "#666",
+    opacity: 0.8,
+    fontSize: 12,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#f0f0f0",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  statusConnected: {
+    backgroundColor: "#e3f2fd",
+  },
+  statusText: {
+    fontSize: 11,
+    color: "#999",
+    fontWeight: "600",
+  },
+  statusTextConnected: {
+    color: "#2196F3",
+  },
+  card: {
+    marginBottom: 10,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  cardContent: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  buttonContainer: {
+    marginTop: 8,
+    marginBottom: 8,
   },
   button: {
-    borderRadius: 30,
+    borderRadius: 16,
+    elevation: 4,
+    shadowColor: "#2196F3",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-   warning: {
-    backgroundColor: "#ffe6e6",
-    padding: 10,
-    marginBottom: 10,
-    borderRadius: 5,
+  buttonContent: {
+    paddingVertical: 6,
   },
-  warningText: {
-    color: "#cc0000",
-    fontWeight: "bold",
-    textAlign: "center",
+  buttonLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
-  container2: { flex: 1, padding: 20 },
-  section2: { marginVertical: 10 },
-  button2: { marginVertical: 10 },
 });

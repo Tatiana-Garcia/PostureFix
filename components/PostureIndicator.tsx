@@ -61,7 +61,7 @@ export const PostureIndicator: React.FC<Props> = ({
       >
         <MaterialCommunityIcons
           name={iconName}
-          size={120}
+          size={100}
           color={iconColor}
           style={{ transform: [{ rotate: `${clampedAngle}deg` }] }}
         />
@@ -81,12 +81,12 @@ export const PostureIndicator: React.FC<Props> = ({
 const styles = StyleSheet.create({
   wrapper: {
     alignItems: "center",
-    marginVertical: 20,
+    marginVertical: 8,
   },
   circle: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     borderWidth: 2,
     justifyContent: "center",
     alignItems: "center",
@@ -106,9 +106,10 @@ const styles = StyleSheet.create({
     color: "#81c784",
   },
   warning: {
-    marginTop: 12,
+    marginTop: 8,
   },
   angle: {
     fontWeight: "bold",
+    fontSize: 18,
   },
 });
