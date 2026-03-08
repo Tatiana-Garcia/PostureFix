@@ -5,6 +5,7 @@ import { HelpSection } from "../../components/HelpSection";
 import { ModeSelector } from "../../components/ModeSelector";
 import { PostureIndicator } from "../../components/PostureIndicator";
 import { TimerPill } from "../../components/TimerPill";
+import { saveSession } from "../../utils/sessionStorage";
 
 export default function Index() {
   const [isRunning, setIsRunning] = React.useState(false);
@@ -60,7 +61,7 @@ export default function Index() {
     return () => clearInterval(id);
   }, [isRunning, isBadPosture]);
 
-  const onToggleSession = () => {
+  const onToggleSession = async () => {
     if (!isRunning) {
       // start session fresh
       setElapsedSeconds(0);
@@ -70,8 +71,11 @@ export default function Index() {
       return;
     }
 
-    // stop session
+    // stop session and save data
     setIsRunning(false);
+    if (rectoSeconds > 0 || encorvadoSeconds > 0) {
+      await saveSession(rectoSeconds, encorvadoSeconds);
+    }
   };
 
   return (
@@ -80,11 +84,9 @@ export default function Index() {
     <View style={styles.container}>
       <View style={styles.section}>
         <ModeSelector
-  value={isBadPosture ? "encorvado" : "recto"} // map bad_posture to mode
-  onChange={() => {}} // can be empty because ESP32 controls it
-  rectoSeconds={rectoSeconds}
-  encorvadoSeconds={encorvadoSeconds}
-/>
+          rectoSeconds={rectoSeconds}
+          encorvadoSeconds={encorvadoSeconds}
+        />
       </View>
       <View style={styles.section}>
         <PostureIndicator angle={angle} isBadPosture={isBadPosture} />
