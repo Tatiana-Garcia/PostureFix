@@ -6,8 +6,8 @@
 #include <Wire.h>
 #include <math.h>
 
-const char* ssid = "TIGO-A9C7";
-const char* password = "tigo2019";
+const char* ssid = "Z16";
+const char* password = "sistemas16";
 
 WebSocketsServer webSocket = WebSocketsServer(81);
 Adafruit_MPU6050 mpu;
