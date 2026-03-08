@@ -1,27 +1,11 @@
 import React from "react";
 import { StyleSheet, View, ScrollView, Dimensions } from "react-native";
 import { Text, Card } from "react-native-paper";
+import { getStatistics, SessionData } from "../../utils/sessionStorage";
 
 const { width } = Dimensions.get("window");
 const CHART_WIDTH = width - 80;
 const MAX_BAR_HEIGHT = 200;
-
-// Mock data - in a real app, this would come from storage/API
-const lifetimeStats = {
-  totalGoodPosture: 125000, // seconds
-  totalBadPosture: 45000, // seconds
-  totalSessions: 12,
-};
-
-const sessionData = [
-  { date: "2024-01-15", good: 7200, bad: 1800 },
-  { date: "2024-01-16", good: 8100, bad: 900 },
-  { date: "2024-01-17", good: 5400, bad: 3600 },
-  { date: "2024-01-18", good: 9000, bad: 0 },
-  { date: "2024-01-19", good: 6300, bad: 2700 },
-  { date: "2024-01-20", good: 7200, bad: 1800 },
-  { date: "2024-01-21", good: 8100, bad: 900 },
-];
 
 const formatTime = (seconds: number): string => {
   const hours = Math.floor(seconds / 3600);
@@ -37,7 +21,13 @@ const formatDate = (dateString: string): string => {
   return date.toLocaleDateString("es-ES", { month: "short", day: "numeric" });
 };
 
-const BarChart = ({ data }: { data: typeof sessionData }) => {
+interface ChartData {
+  date: string;
+  good: number;
+  bad: number;
+}
+
+const BarChart = ({ data }: { data: ChartData[] }) => {
   const maxValue = Math.max(
     ...data.map((d) => d.good + d.bad)
   );
@@ -94,13 +84,61 @@ const BarChart = ({ data }: { data: typeof sessionData }) => {
 };
 
 export default function Statistics() {
+  const [lifetimeStats, setLifetimeStats] = React.useState({
+    totalGoodPosture: 0,
+    totalBadPosture: 0,
+    totalSessions: 0,
+  });
+  const [sessionData, setSessionData] = React.useState<ChartData[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    loadStatistics();
+  }, []);
+
+  const loadStatistics = async () => {
+    try {
+      const stats = await getStatistics();
+      setLifetimeStats({
+        totalGoodPosture: stats.totalGoodPosture,
+        totalBadPosture: stats.totalBadPosture,
+        totalSessions: stats.totalSessions,
+      });
+      
+      // Convert session data to chart format
+      const chartData: ChartData[] = stats.recentSessions.map((session) => ({
+        date: session.date,
+        good: session.rectoSeconds,
+        bad: session.encorvadoSeconds,
+      }));
+      setSessionData(chartData);
+    } catch (error) {
+      console.error('Error loading statistics:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const totalTime = lifetimeStats.totalGoodPosture + lifetimeStats.totalBadPosture;
-  const goodPercentage = Math.round(
-    (lifetimeStats.totalGoodPosture / totalTime) * 100
-  );
-  const badPercentage = Math.round(
-    (lifetimeStats.totalBadPosture / totalTime) * 100
-  );
+  const goodPercentage = totalTime > 0 
+    ? Math.round((lifetimeStats.totalGoodPosture / totalTime) * 100)
+    : 0;
+  const badPercentage = totalTime > 0
+    ? Math.round((lifetimeStats.totalBadPosture / totalTime) * 100)
+    : 0;
+
+  if (isLoading) {
+    return (
+      <ScrollView style={styles.container}>
+        <View style={styles.content}>
+          <Text variant="headlineSmall" style={styles.title}>
+            Estadísticas
+          </Text>
+          <Text>Cargando...</Text>
+        </View>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -161,11 +199,13 @@ export default function Statistics() {
           </Card.Content>
         </Card>
 
-        <Card style={styles.card}>
-          <Card.Content>
-            <BarChart data={sessionData} />
-          </Card.Content>
-        </Card>
+        {sessionData.length > 0 && (
+          <Card style={styles.card}>
+            <Card.Content>
+              <BarChart data={sessionData} />
+            </Card.Content>
+          </Card>
+        )}
       </View>
     </ScrollView>
   );
@@ -288,4 +328,8 @@ const styles = StyleSheet.create({
     color: "#666",
   },
 });
+
+
+
+
 

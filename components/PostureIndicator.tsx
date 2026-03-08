@@ -40,11 +40,15 @@ export const PostureIndicator: React.FC<Props> = ({
     transform: [{ scale: scale.value }],
   }));
 
+  // Keep sitting posture icons for both states, but still lean based on angle
   const iconName = isBadPosture ? "seat-recline-extra" : "seat-recline-normal";
   const iconColor = isBadPosture ? "#e57373" : "#81c784";
   const message = isBadPosture ? "¡Arregla tu postura!" : "¡Buen trabajo!";
   const circleStyle = isBadPosture ? styles.badCircle : styles.goodCircle;
   const messageStyle = isBadPosture ? styles.badWarning : styles.goodWarning;
+
+  // Limit how much the icon leans so it doesn't rotate too extremely
+  const clampedAngle = Math.max(-15, Math.min(angle, 45));
 
   return (
     <View style={styles.wrapper}>
@@ -59,6 +63,7 @@ export const PostureIndicator: React.FC<Props> = ({
           name={iconName}
           size={120}
           color={iconColor}
+          style={{ transform: [{ rotate: `${clampedAngle}deg` }] }}
         />
       </Animated.View>
 
@@ -67,7 +72,7 @@ export const PostureIndicator: React.FC<Props> = ({
       </Text>
 
       <Text variant="headlineSmall" style={styles.angle}>
-        {angle}°
+        {angle.toFixed(1)}°
       </Text>
     </View>
   );
@@ -83,15 +88,16 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 110,
     borderWidth: 2,
-    borderColor: "#c4c4c4",
     justifyContent: "center",
     alignItems: "center",
   },
   badCircle: {
     borderColor: "#e57373",
+    backgroundColor: "#ffebee",
   },
   goodCircle: {
     borderColor: "#81c784",
+    backgroundColor: "#e8f5e9",
   },
   badWarning: {
     color: "#e57373",

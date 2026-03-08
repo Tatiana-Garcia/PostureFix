@@ -5,6 +5,7 @@ import { HelpSection } from "../../components/HelpSection";
 import { ModeSelector } from "../../components/ModeSelector";
 import { PostureIndicator } from "../../components/PostureIndicator";
 import { TimerPill } from "../../components/TimerPill";
+import { saveSession } from "../../utils/sessionStorage";
 
 export default function Index() {
   const [isRunning, setIsRunning] = React.useState(false);
@@ -12,8 +13,38 @@ export default function Index() {
   const [rectoSeconds, setRectoSeconds] = React.useState(0);
   const [encorvadoSeconds, setEncorvadoSeconds] = React.useState(0);
 
-  const angle = 17;
+  const [angle, setAngle] = React.useState(0);
+  const [isConnected, setIsConnected] = React.useState(false);
   const isBadPosture = angle > 20;
+
+  React.useEffect(() => {
+  const ws = new WebSocket("ws://10.138.36.102:81");
+
+  ws.onopen = () => {
+    setIsConnected(true); 
+    console.log("Connected to ESP32 WebSocket");
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (typeof data.angle === "number") setAngle(data.angle);
+    } catch (err) {
+      console.error("Failed to parse WebSocket message:", event.data);
+    }
+  };
+
+  ws.onerror = (error) => {
+    console.log("WebSocket error:", error);
+  };
+
+  ws.onclose = () => {
+    setIsConnected(false);
+    console.log("WebSocket closed");
+  };
+
+  return () => ws.close();
+}, []);
 
   React.useEffect(() => {
     if (!isRunning) return;
@@ -30,7 +61,7 @@ export default function Index() {
     return () => clearInterval(id);
   }, [isRunning, isBadPosture]);
 
-  const onToggleSession = () => {
+  const onToggleSession = async () => {
     if (!isRunning) {
       // start session fresh
       setElapsedSeconds(0);
@@ -40,11 +71,16 @@ export default function Index() {
       return;
     }
 
-    // stop session
+    // stop session and save data
     setIsRunning(false);
+    if (rectoSeconds > 0 || encorvadoSeconds > 0) {
+      await saveSession(rectoSeconds, encorvadoSeconds);
+    }
   };
 
   return (
+    
+
     <View style={styles.container}>
       <View style={styles.section}>
         <ModeSelector
@@ -82,4 +118,18 @@ const styles = StyleSheet.create({
   button: {
     borderRadius: 30,
   },
+   warning: {
+    backgroundColor: "#ffe6e6",
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+  warningText: {
+    color: "#cc0000",
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  container2: { flex: 1, padding: 20 },
+  section2: { marginVertical: 10 },
+  button2: { marginVertical: 10 },
 });
