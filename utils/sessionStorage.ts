@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const SESSION_DATA_FILE = `${FileSystem.documentDirectory}session_data.txt`;
 
