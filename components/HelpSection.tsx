@@ -1,7 +1,7 @@
+import { useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Text } from "react-native-paper";
-import { useRouter } from "expo-router";
 
 export const HelpSection: React.FC = () => {
   const router = useRouter();
@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   link: {
-    color: "#6750a4",
+    color: "#2196F3",
     fontWeight: "bold",
     marginTop: 4,
   },
