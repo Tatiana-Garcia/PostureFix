@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import { Button, Card, Text } from "react-native-paper";
+import { BatteryIndicator } from "../../components/BatteryIndicator";
 import { ModeSelector } from "../../components/ModeSelector";
 import { PostureIndicator } from "../../components/PostureIndicator";
 import { TimerPill } from "../../components/TimerPill";
@@ -16,6 +17,7 @@ export default function Index() {
   const [angle, setAngle] = React.useState(0);
   const [isBadPosture, setIsBadPosture] = React.useState(false);
   const [isConnected, setIsConnected] = React.useState(false);
+  const [batteryLevel, setBatteryLevel] = React.useState<number | null>(null);
 
   React.useEffect(() => {
   const ws = new WebSocket("ws://10.138.36.102:81");
@@ -30,6 +32,9 @@ export default function Index() {
       const data = JSON.parse(event.data);
       if (typeof data.angle === "number") setAngle(data.angle);
       if (typeof data.bad_posture === "boolean") setIsBadPosture(data.bad_posture);
+      if (typeof data.battery === "number") {
+        setBatteryLevel(Math.max(0, Math.min(100, data.battery))); // Clamp between 0-100
+      }
     } catch (err) {
       console.error("Failed to parse WebSocket message:", event.data);
     }
@@ -91,15 +96,18 @@ export default function Index() {
             Monitorea tu postura en tiempo real
           </Text>
         </View>
-        <View style={[styles.statusBadge, isConnected && styles.statusConnected]}>
-          <MaterialCommunityIcons 
-            name={isConnected ? "wifi" : "wifi-off"} 
-            size={14} 
-            color={isConnected ? "#2196F3" : "#999"} 
-          />
-          <Text style={[styles.statusText, isConnected && styles.statusTextConnected]}>
-            {isConnected ? "Conectado" : "Desconectado"}
-          </Text>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusBadge, isConnected && styles.statusConnected]}>
+            <MaterialCommunityIcons 
+              name={isConnected ? "wifi" : "wifi-off"} 
+              size={14} 
+              color={isConnected ? "#2196F3" : "#999"} 
+            />
+            <Text style={[styles.statusText, isConnected && styles.statusTextConnected]}>
+              {isConnected ? "Conectado" : "Desconectado"}
+            </Text>
+          </View>
+          <BatteryIndicator batteryLevel={batteryLevel} />
         </View>
       </View>
 
@@ -170,6 +178,11 @@ const styles = StyleSheet.create({
     color: "#666",
     opacity: 0.8,
     fontSize: 12,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   statusBadge: {
     flexDirection: "row",
