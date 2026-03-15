@@ -18,7 +18,7 @@ export default function Index() {
   const [isConnected, setIsConnected] = React.useState(false);
 
   React.useEffect(() => {
-  const ws = new WebSocket("ws://10.179.4.102:81");
+  const ws = new WebSocket("ws://10.137.18.68:81");
 
   ws.onopen = () => {
     setIsConnected(true); 
