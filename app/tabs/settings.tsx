@@ -1,33 +1,196 @@
-import React, { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
-import { Button, Text } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { Button, Card, ProgressBar, Text } from "react-native-paper";
 import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import {
+  CalibrationData,
+  clearCalibration,
+  loadCalibration,
+  saveCalibration
+} from "../../utils/calibrationStorage";
+
+const CALIBRATION_DURATION = 3000; // 3 seconds
+const SAMPLE_INTERVAL = 100; // Sample every 100ms
 
 export default function Settings() {
-  const [isCalibrated, setIsCalibrated] = useState(false);
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [calibrationProgress, setCalibrationProgress] = useState(0);
+  const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
+  const [currentAngle, setCurrentAngle] = useState<number | null>(null);
+  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [collectedAngles, setCollectedAngles] = useState<number[]>([]);
+  const calibrationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scale = useSharedValue(1);
   const successOpacity = useSharedValue(0);
 
-  const handleCalibrate = () => {
-    setIsCalibrated(true);
-    scale.value = withTiming(0.95, {
-      duration: 100,
-      easing: Easing.out(Easing.ease),
-    }, () => {
-      scale.value = withTiming(1, {
-        duration: 200,
-        easing: Easing.out(Easing.ease),
-      });
-    });
-    successOpacity.value = withTiming(1, {
-      duration: 300,
-      easing: Easing.out(Easing.ease),
-    });
+  // Load existing calibration on mount
+  useEffect(() => {
+    loadCalibration().then(setCalibrationData);
+  }, []);
+
+  // Connect to WebSocket to get current angle
+  useEffect(() => {
+    const websocket = new WebSocket("ws://10.138.36.102:81");
+    
+    websocket.onopen = () => {
+      console.log("Settings: Connected to ESP32");
+      setWs(websocket);
+    };
+
+    websocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (typeof data.angle === "number") {
+          setCurrentAngle(data.angle);
+          
+          // Collect angles during calibration
+          if (isCalibrating) {
+            setCollectedAngles(prev => [...prev, data.angle]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse WebSocket message:", event.data);
+      }
+    };
+
+    websocket.onerror = (error) => {
+      console.log("WebSocket error:", error);
+    };
+
+    websocket.onclose = () => {
+      console.log("Settings: WebSocket closed");
+      setWs(null);
+    };
+
+    return () => {
+      websocket.close();
+      if (calibrationIntervalRef.current) {
+        clearInterval(calibrationIntervalRef.current);
+      }
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, [isCalibrating]);
+
+  const handleCalibrate = async () => {
+    if (!ws || currentAngle === null) {
+      Alert.alert(
+        "Error",
+        "No se puede calibrar. Asegúrate de estar conectado al dispositivo y en una postura correcta."
+      );
+      return;
+    }
+
+    setIsCalibrating(true);
+    setCalibrationProgress(0);
+    setCollectedAngles([]);
+
+    // Start progress bar animation
+    const progressSteps = CALIBRATION_DURATION / 50; // Update every 50ms
+    let progress = 0;
+    
+    progressIntervalRef.current = setInterval(() => {
+      progress += 50;
+      const newProgress = Math.min(progress / CALIBRATION_DURATION, 1);
+      setCalibrationProgress(newProgress);
+      
+      if (newProgress >= 1) {
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+        }
+      }
+    }, 50);
+
+    // Wait for calibration duration
+    setTimeout(async () => {
+      // Calculate average angle from collected readings
+      if (collectedAngles.length === 0) {
+        setIsCalibrating(false);
+        setCalibrationProgress(0);
+        Alert.alert("Error", "No se recibieron datos durante la calibración.");
+        return;
+      }
+
+      const averageAngle = collectedAngles.reduce((sum, angle) => sum + angle, 0) / collectedAngles.length;
+      const roundedAngle = Math.round(averageAngle * 10) / 10; // Round to 1 decimal
+
+      // Send calibration command to ESP32
+      try {
+        ws.send(JSON.stringify({ 
+          command: "calibrate",
+          baseline_angle: roundedAngle 
+        }));
+
+        // Store calibration locally
+        const newCalibration: CalibrationData = {
+          baselineAngle: roundedAngle,
+          thresholdAngle: 20,
+          calibratedAt: new Date().toISOString(),
+        };
+
+        await saveCalibration(newCalibration);
+        setCalibrationData(newCalibration);
+
+        // Animate success
+        scale.value = withTiming(0.95, {
+          duration: 100,
+          easing: Easing.out(Easing.ease),
+        }, () => {
+          scale.value = withTiming(1, {
+            duration: 200,
+            easing: Easing.out(Easing.ease),
+          });
+        });
+        successOpacity.value = withTiming(1, {
+          duration: 300,
+          easing: Easing.out(Easing.ease),
+        });
+
+        Alert.alert(
+          "Calibración exitosa",
+          `Ángulo de referencia establecido: ${roundedAngle.toFixed(1)}°\n\nBasado en ${collectedAngles.length} lecturas.`
+        );
+      } catch (error) {
+        Alert.alert("Error", "No se pudo completar la calibración");
+        console.error("Calibration error:", error);
+      } finally {
+        setIsCalibrating(false);
+        setCalibrationProgress(0);
+        setCollectedAngles([]);
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+        }
+      }
+    }, CALIBRATION_DURATION);
+  };
+
+  const handleResetCalibration = async () => {
+    Alert.alert(
+      "Restablecer calibración",
+      "¿Estás seguro de que quieres restablecer la calibración?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Restablecer",
+          style: "destructive",
+          onPress: async () => {
+            await clearCalibration();
+            setCalibrationData(null);
+            if (ws) {
+              ws.send(JSON.stringify({ command: "reset_calibration" }));
+            }
+          },
+        },
+      ]
+    );
   };
 
   const animatedButtonStyle = useAnimatedStyle(() => {
@@ -42,6 +205,8 @@ export default function Settings() {
     };
   });
 
+  const remainingTime = Math.ceil((1 - calibrationProgress) * (CALIBRATION_DURATION / 1000));
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.content}>
@@ -49,33 +214,91 @@ export default function Settings() {
           Configuración
         </Text>
         
-        <View style={styles.section}>
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            Calibración del dispositivo
-          </Text>
-          <Text variant="bodyMedium" style={styles.description}>
-            Calibra tu dispositivo para obtener mediciones precisas de tu postura.
-          </Text>
-          
-          <Animated.View style={animatedButtonStyle}>
-            <Button
-              mode="contained"
-              onPress={handleCalibrate}
-              disabled={isCalibrated}
-              buttonColor={isCalibrated ? "#81c784" : "#2196F3"}
-              style={styles.button}
-              labelStyle={styles.buttonLabel}
-            >
-              {isCalibrated ? "Calibrado" : "Calibrar"}
-            </Button>
-          </Animated.View>
-          
-          {isCalibrated && (
-            <Animated.View style={[styles.successContainer, animatedTextStyle]}>
-              <Text style={styles.successText}>✓ Dispositivo calibrado correctamente</Text>
+        <Card style={styles.card}>
+          <Card.Content>
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              Calibración del dispositivo
+            </Text>
+            <Text variant="bodyMedium" style={styles.description}>
+              Siéntate en una postura correcta y presiona "Calibrar". El proceso tomará {CALIBRATION_DURATION / 1000} segundos para obtener una lectura precisa.
+            </Text>
+
+            {currentAngle !== null && (
+              <View style={styles.angleDisplay}>
+                <MaterialCommunityIcons name="angle-acute" size={24} color="#2196F3" />
+                <Text variant="titleLarge" style={styles.angleText}>
+                  {currentAngle.toFixed(1)}°
+                </Text>
+                {isCalibrating && (
+                  <Text variant="bodySmall" style={styles.calibratingText}>
+                    Midiendo...
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {isCalibrating && (
+              <View style={styles.progressContainer}>
+                <ProgressBar 
+                  progress={calibrationProgress} 
+                  color="#2196F3"
+                  style={styles.progressBar}
+                />
+                <Text variant="bodySmall" style={styles.progressText}>
+                  {remainingTime > 0 ? `${remainingTime}s restantes` : "Finalizando..."}
+                </Text>
+                {collectedAngles.length > 0 && (
+                  <Text variant="bodySmall" style={styles.samplesText}>
+                    {collectedAngles.length} lecturas recopiladas
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {calibrationData && !isCalibrating && (
+              <View style={styles.calibrationInfo}>
+                <Text variant="bodySmall" style={styles.infoText}>
+                  Última calibración: {calibrationData.baselineAngle.toFixed(1)}°
+                </Text>
+                <Text variant="bodySmall" style={styles.infoText}>
+                  Calibrado el: {new Date(calibrationData.calibratedAt).toLocaleDateString('es-ES')}
+                </Text>
+              </View>
+            )}
+            
+            <Animated.View style={animatedButtonStyle}>
+              <Button
+                mode="contained"
+                onPress={handleCalibrate}
+                disabled={isCalibrating || currentAngle === null || !ws}
+                buttonColor="#2196F3"
+                style={styles.button}
+                labelStyle={styles.buttonLabel}
+                loading={isCalibrating}
+              >
+                {isCalibrating ? "Calibrando..." : "Calibrar"}
+              </Button>
             </Animated.View>
-          )}
-        </View>
+
+            {calibrationData && !isCalibrating && (
+              <Button
+                mode="outlined"
+                onPress={handleResetCalibration}
+                style={styles.resetButton}
+              >
+                Restablecer calibración
+              </Button>
+            )}
+            
+            {calibrationData && !isCalibrating && (
+              <Animated.View style={[styles.successContainer, animatedTextStyle]}>
+                <Text style={styles.successText}>
+                  ✓ Dispositivo calibrado correctamente
+                </Text>
+              </Animated.View>
+            )}
+          </Card.Content>
+        </Card>
       </View>
     </ScrollView>
   );
@@ -93,25 +316,76 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     fontWeight: "bold",
   },
-  section: {
+  card: {
+    marginBottom: 16,
     backgroundColor: "#ffffff",
     borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
   },
   sectionTitle: {
     marginBottom: 8,
     fontWeight: "600",
   },
   description: {
-    marginBottom: 20,
+    marginBottom: 16,
     color: "#666",
+  },
+  angleDisplay: {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    padding: 16,
+    backgroundColor: "#e3f2fd",
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  angleText: {
+    fontWeight: "700",
+    color: "#2196F3",
+  },
+  calibratingText: {
+    color: "#2196F3",
+    fontSize: 12,
+    fontStyle: "italic",
+  },
+  progressContainer: {
+    marginBottom: 16,
+  },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  progressText: {
+    textAlign: "center",
+    color: "#666",
+    marginBottom: 4,
+  },
+  samplesText: {
+    textAlign: "center",
+    color: "#999",
+    fontSize: 11,
+  },
+  calibrationInfo: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: "#f5f5f5",
+    borderRadius: 8,
+  },
+  infoText: {
+    color: "#666",
+    marginBottom: 4,
   },
   button: {
     borderRadius: 30,
+    marginBottom: 8,
   },
   buttonLabel: {
     paddingVertical: 4,
+  },
+  resetButton: {
+    borderRadius: 30,
+    marginTop: 8,
   },
   successContainer: {
     marginTop: 16,
@@ -125,4 +399,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-
