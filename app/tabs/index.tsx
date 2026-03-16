@@ -6,8 +6,8 @@ import { BatteryIndicator } from "../../components/BatteryIndicator";
 import { ModeSelector } from "../../components/ModeSelector";
 import { PostureIndicator } from "../../components/PostureIndicator";
 import { TimerPill } from "../../components/TimerPill";
+import { useWebSocket } from "../../hooks/useWebSocket";
 import { saveSession } from "../../utils/sessionStorage";
-import { webSocket } from "../../utils/webSocket";
 
 export default function Index() {
   const [isRunning, setIsRunning] = React.useState(false);
@@ -26,7 +26,7 @@ export default function Index() {
     angle,
     isBadPosture,
     batteryLevel
-  } = webSocket();
+  } = useWebSocket();
 
   console.log({
   rectoSeconds,

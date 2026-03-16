@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { Button, Card, ProgressBar, Text } from "react-native-paper";
-import { webSocket } from "../../utils/webSocket";
+import { useWebSocket } from "../../hooks/useWebSocket";
 
 import Animated, {
   Easing,
@@ -30,7 +30,7 @@ export default function Settings() {
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const scale = useSharedValue(1);
   const successOpacity = useSharedValue(0);
-  const { connect, send, isConnected, angle } = webSocket();
+  const { connect, send, isConnected, angle } = useWebSocket();
 
 
   useEffect(() => {

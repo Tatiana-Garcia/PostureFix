@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 
 const WS_URL = "ws://10.138.36.102:81";
 
-export function webSocket() {
+export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
 
   const [isConnected, setIsConnected] = useState(false);
