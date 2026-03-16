@@ -16,6 +16,8 @@ export default function Index() {
   const [encorvadoSeconds, setEncorvadoSeconds] = React.useState(0);
 
 
+  /*React.useEffect(() => {
+  const ws = new WebSocket("ws://10.137.18.68:81");*/
 
   const {
     connect,
