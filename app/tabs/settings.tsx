@@ -26,11 +26,11 @@ export default function Settings() {
   const [calibrationProgress, setCalibrationProgress] = useState(0);
   const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
   const [collectedAngles, setCollectedAngles] = useState<number[]>([]);
-  const calibrationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const scale = useSharedValue(1);
   const successOpacity = useSharedValue(0);
   const { connect, send, isConnected, angle } = useWebSocket();
+  const collectedAnglesRef = useRef<number[]>([]);
 
 
   useEffect(() => {
@@ -41,12 +41,28 @@ export default function Settings() {
   connect();
 }, []);
 
+useEffect(() => {
+  if (!isCalibrating) return;
+  if (angle === null) return;
+
+  const id = setInterval(() => {
+    collectedAnglesRef.current.push(angle); // real storage
+    setCollectedAngles([...collectedAnglesRef.current]); // UI update
+  }, SAMPLE_INTERVAL);
+
+  return () => clearInterval(id);
+}, [isCalibrating, angle]);
+
   const handleCalibrate = async () => {
-    
+    if (!isConnected || angle === null) {
+  Alert.alert("Error", "No se están recibiendo datos del dispositivo.");
+  return;
+}
 
     setIsCalibrating(true);
     setCalibrationProgress(0);
-    setCollectedAngles([]);
+    collectedAnglesRef.current = [];
+setCollectedAngles([]);
 
     // Start progress bar animation
     const progressSteps = CALIBRATION_DURATION / 50; // Update every 50ms
@@ -67,14 +83,16 @@ export default function Settings() {
     // Wait for calibration duration
     setTimeout(async () => {
       // Calculate average angle from collected readings
-      if (collectedAngles.length === 0) {
+      if (collectedAnglesRef.current.length === 0) {
         setIsCalibrating(false);
         setCalibrationProgress(0);
         Alert.alert("Error", "No se recibieron datos durante la calibración.");
         return;
       }
 
-      const averageAngle = collectedAngles.reduce((sum, angle) => sum + angle, 0) / collectedAngles.length;
+      const averageAngle =
+  collectedAnglesRef.current.reduce((sum, a) => sum + a, 0) /
+  collectedAnglesRef.current.length;
       const roundedAngle = Math.round(averageAngle * 10) / 10; // Round to 1 decimal
 
       // Send calibration command to ESP32
@@ -222,7 +240,7 @@ export default function Settings() {
               <Button
                 mode="contained"
                 onPress={handleCalibrate}
-                disabled={isCalibrating || !isConnected}
+                //disabled={isCalibrating || !isConnected}
                 buttonColor="#2196F3"
                 style={styles.button}
                 labelStyle={styles.buttonLabel}

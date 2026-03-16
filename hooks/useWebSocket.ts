@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 
-const WS_URL = "ws://10.138.36.102:81";
+const WS_URL = "ws://10.137.18.68:81";
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
