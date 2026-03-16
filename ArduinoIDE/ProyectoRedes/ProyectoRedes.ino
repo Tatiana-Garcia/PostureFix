@@ -41,47 +41,34 @@ void cargarCalibracion(){
 }
 
 float leerVoltajeBateria(){
-
   int raw = analogRead(PIN_BATERIA);
-
   if(raw == 0) return 4.0; // simulación si no hay batería
-
   float volt = (raw / 4095.0) * 3.3;
   volt = volt * 2;
-
   return volt;
 }
 
 int calcularPorcentaje(float volt){
-
   if(volt >= 4.2) return 100;
   if(volt <= 3.3) return 0;
-
   return (volt - 3.3) * 100 / (4.2 - 3.3);
 }
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
-
   if(type == WStype_CONNECTED) Serial.println("Client connected");
-
   if(type == WStype_DISCONNECTED) Serial.println("Client disconnected");
 
   if(type == WStype_TEXT){
-
     DynamicJsonDocument doc(256);
     deserializeJson(doc, payload);
 
     String cmd = doc["command"];
 
     if(cmd == "calibrate"){
-
       sensors_event_t a,g,temp;
       mpu.getEvent(&a,&g,&temp);
-
       offsetAngulo = atan2(a.acceleration.z,-a.acceleration.y)*180/M_PI;
-
       guardarCalibracion(offsetAngulo);
-
       webSocket.broadcastTXT("{\"calibration\":\"saved\"}");
     }
 
@@ -93,10 +80,20 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
   }
 }
 
+void enviarEstadoSistema(){
+  // Enviamos JSON con el estado ON/OFF
+  String data = "{";
+  data += "\"angle\":" + String(inclinacion) + ",";
+  data += "\"bad_posture\":" + String((abs(inclinacion) > UMBRAL_ANGULO) ? "true" : "false") + ",";
+  data += "\"active\":" + String(sistemaActivo ? "true" : "false") + ",";
+  data += "\"battery\":" + String(porcentajeBateria);
+  data += "}";
+  webSocket.broadcastTXT(data);
+  Serial.println(data);
+}
+
 void setup(){
-
   Serial.begin(115200);
-
   pinMode(PIN_MOTOR,OUTPUT);
   pinMode(PIN_BOTON,INPUT_PULLUP);
   pinMode(PIN_BATERIA,INPUT);
@@ -119,12 +116,10 @@ void setup(){
   WiFi.begin(ssid,password);
 
   Serial.print("Connecting");
-
   while(WiFi.status()!=WL_CONNECTED){
     delay(500);
     Serial.print(".");
   }
-
   Serial.println();
   Serial.println(WiFi.localIP());
 
@@ -137,83 +132,58 @@ void setup(){
 }
 
 void loop(){
-
   webSocket.loop();
 
   bool estadoActualBoton = digitalRead(PIN_BOTON);
 
+  // Detectamos cambio de estado del botón
   if(ultimoEstadoBoton==HIGH && estadoActualBoton==LOW){
-
-    sistemaActivo = !sistemaActivo;
+    sistemaActivo = !sistemaActivo; // Toggle ON/OFF
 
     if(sistemaActivo){
-
       sensors_event_t a,g,temp;
       mpu.getEvent(&a,&g,&temp);
-
       offsetAngulo = atan2(a.acceleration.z,-a.acceleration.y)*180/M_PI;
-
       Serial.println(">>> SISTEMA ON <<<");
-
     }else{
-
       Serial.println(">>> SISTEMA OFF <<<");
       digitalWrite(PIN_MOTOR,LOW);
-
     }
 
-    delay(200);
-  }
+    // Enviamos estado inmediatamente al cambiar
+    enviarEstadoSistema();
 
+    delay(200); // anti-rebote
+  }
   ultimoEstadoBoton = estadoActualBoton;
 
   if(sistemaActivo){
-
     sensors_event_t a,g,temp;
     mpu.getEvent(&a,&g,&temp);
-
     float anguloCrudo = atan2(a.acceleration.z,-a.acceleration.y)*180/M_PI;
-
     inclinacion = anguloCrudo - offsetAngulo;
-
     if(inclinacion>180) inclinacion-=360;
     if(inclinacion<-180) inclinacion+=360;
 
     if(abs(inclinacion)>UMBRAL_ANGULO){
-
       digitalWrite(PIN_MOTOR,HIGH);
       Serial.print("Mala postura");
-
     }else{
-
       digitalWrite(PIN_MOTOR,LOW);
       Serial.print("Postura correcta");
-
     }
 
     voltajeBateria = leerVoltajeBateria();
     porcentajeBateria = calcularPorcentaje(voltajeBateria);
 
-    String data = "{";
-    data += "\"angle\":"+String(inclinacion)+",";
-    data += "\"bad_posture\":"+(abs(inclinacion)>UMBRAL_ANGULO?"true":"false")+",";
-    data += "\"active\":true,";
-    data += "\"battery\":"+String(porcentajeBateria);
-    data += "}";
-
-    webSocket.broadcastTXT(data);
-
-    Serial.println(data);
-
+    // Enviamos estado periódicamente
+    enviarEstadoSistema();
   }else{
-
     static unsigned long ultimaVezOff=0;
-
     if(millis()-ultimaVezOff>2000){
-
-      webSocket.broadcastTXT("{\"active\":false}");
+      // Mantener actualizado el OFF a la app
+      enviarEstadoSistema();
       ultimaVezOff=millis();
-
     }
   }
 
