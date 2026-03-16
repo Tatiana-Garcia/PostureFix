@@ -7,6 +7,7 @@ import { ModeSelector } from "../../components/ModeSelector";
 import { PostureIndicator } from "../../components/PostureIndicator";
 import { TimerPill } from "../../components/TimerPill";
 import { saveSession } from "../../utils/sessionStorage";
+import { webSocket } from "../../utils/webSocket";
 
 export default function Index() {
   const [isRunning, setIsRunning] = React.useState(false);
@@ -14,43 +15,24 @@ export default function Index() {
   const [rectoSeconds, setRectoSeconds] = React.useState(0);
   const [encorvadoSeconds, setEncorvadoSeconds] = React.useState(0);
 
-  const [angle, setAngle] = React.useState(0);
-  const [isBadPosture, setIsBadPosture] = React.useState(false);
-  const [isConnected, setIsConnected] = React.useState(false);
-  const [batteryLevel, setBatteryLevel] = React.useState<number | null>(null);
 
-  React.useEffect(() => {
-  const ws = new WebSocket("ws://10.138.36.102:81");
 
-  ws.onopen = () => {
-    setIsConnected(true); 
-    console.log("Connected to ESP32 WebSocket");
-  };
+  const {
+    connect,
+    disconnect,
+    isConnected,
+    angle,
+    isBadPosture,
+    batteryLevel
+  } = webSocket();
 
-  ws.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      if (typeof data.angle === "number") setAngle(data.angle);
-      if (typeof data.bad_posture === "boolean") setIsBadPosture(data.bad_posture);
-      if (typeof data.battery === "number") {
-        setBatteryLevel(Math.max(0, Math.min(100, data.battery))); // Clamp between 0-100
-      }
-    } catch (err) {
-      console.error("Failed to parse WebSocket message:", event.data);
-    }
-  };
-
-  ws.onerror = (error) => {
-    console.log("WebSocket error:", error);
-  };
-
-  ws.onclose = () => {
-    setIsConnected(false);
-    console.log("WebSocket closed");
-  };
-
-  return () => ws.close();
-}, []);
+  console.log({
+  rectoSeconds,
+  encorvadoSeconds,
+  batteryLevel,
+  angle,
+  isBadPosture
+});
 
   React.useEffect(() => {
     if (!isRunning) return;
@@ -98,10 +80,10 @@ export default function Index() {
         </View>
         <View style={styles.statusRow}>
           <View style={[styles.statusBadge, isConnected && styles.statusConnected]}>
-            <MaterialCommunityIcons 
-              name={isConnected ? "wifi" : "wifi-off"} 
-              size={14} 
-              color={isConnected ? "#2196F3" : "#999"} 
+            <MaterialCommunityIcons
+              name={isConnected ? "wifi" : "wifi-off"}
+              size={14}
+              color={isConnected ? "#2196F3" : "#999"}
             />
             <Text style={[styles.statusText, isConnected && styles.statusTextConnected]}>
               {isConnected ? "Conectado" : "Desconectado"}
@@ -135,16 +117,27 @@ export default function Index() {
         </Card.Content>
       </Card>
 
+      {/* Botón de conectar*/}
+      <Button
+        mode="outlined"
+        onPress={connect}
+        disabled={isConnected}
+        icon="wifi"
+      >
+        Conectar dispositivo
+      </Button>
+
       {/* Action Button */}
       <View style={styles.buttonContainer}>
-        <Button 
-          mode="contained" 
-          style={styles.button} 
+        <Button
+          mode="contained"
+          style={styles.button}
           buttonColor="#2196F3"
           contentStyle={styles.buttonContent}
           labelStyle={styles.buttonLabel}
           onPress={onToggleSession}
           icon={isRunning ? "stop" : "play"}
+          disabled={!isConnected}
         >
           {isRunning ? "Terminar sesión" : "Empezar sesión"}
         </Button>

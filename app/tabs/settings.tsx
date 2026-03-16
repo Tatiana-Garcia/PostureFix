@@ -2,6 +2,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { Button, Card, ProgressBar, Text } from "react-native-paper";
+import { webSocket } from "../../utils/webSocket";
+
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -18,76 +20,29 @@ import {
 const CALIBRATION_DURATION = 3000; // 3 seconds
 const SAMPLE_INTERVAL = 100; // Sample every 100ms
 
+
 export default function Settings() {
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [calibrationProgress, setCalibrationProgress] = useState(0);
   const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
-  const [currentAngle, setCurrentAngle] = useState<number | null>(null);
-  const [ws, setWs] = useState<WebSocket | null>(null);
   const [collectedAngles, setCollectedAngles] = useState<number[]>([]);
-  const calibrationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const calibrationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const scale = useSharedValue(1);
   const successOpacity = useSharedValue(0);
+  const { connect, send, isConnected, angle } = webSocket();
 
-  // Load existing calibration on mount
+
   useEffect(() => {
     loadCalibration().then(setCalibrationData);
   }, []);
 
-  // Connect to WebSocket to get current angle
   useEffect(() => {
-    const websocket = new WebSocket("ws://10.138.36.102:81");
-    
-    websocket.onopen = () => {
-      console.log("Settings: Connected to ESP32");
-      setWs(websocket);
-    };
-
-    websocket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (typeof data.angle === "number") {
-          setCurrentAngle(data.angle);
-          
-          // Collect angles during calibration
-          if (isCalibrating) {
-            setCollectedAngles(prev => [...prev, data.angle]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to parse WebSocket message:", event.data);
-      }
-    };
-
-    websocket.onerror = (error) => {
-      console.log("WebSocket error:", error);
-    };
-
-    websocket.onclose = () => {
-      console.log("Settings: WebSocket closed");
-      setWs(null);
-    };
-
-    return () => {
-      websocket.close();
-      if (calibrationIntervalRef.current) {
-        clearInterval(calibrationIntervalRef.current);
-      }
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-    };
-  }, [isCalibrating]);
+  connect();
+}, []);
 
   const handleCalibrate = async () => {
-    if (!ws || currentAngle === null) {
-      Alert.alert(
-        "Error",
-        "No se puede calibrar. Asegúrate de estar conectado al dispositivo y en una postura correcta."
-      );
-      return;
-    }
+    
 
     setIsCalibrating(true);
     setCalibrationProgress(0);
@@ -124,15 +79,14 @@ export default function Settings() {
 
       // Send calibration command to ESP32
       try {
-        ws.send(JSON.stringify({ 
-          command: "calibrate",
-          baseline_angle: roundedAngle 
-        }));
+        send({
+  command: "calibrate",
+});
 
         // Store calibration locally
         const newCalibration: CalibrationData = {
           baselineAngle: roundedAngle,
-          thresholdAngle: 20,
+          thresholdAngle: 15,
           calibratedAt: new Date().toISOString(),
         };
 
@@ -184,9 +138,7 @@ export default function Settings() {
           onPress: async () => {
             await clearCalibration();
             setCalibrationData(null);
-            if (ws) {
-              ws.send(JSON.stringify({ command: "reset_calibration" }));
-            }
+            send({ command: "reset_calibration" });
           },
         },
       ]
@@ -223,11 +175,11 @@ export default function Settings() {
               Siéntate en una postura correcta y presiona "Calibrar". El proceso tomará {CALIBRATION_DURATION / 1000} segundos para obtener una lectura precisa.
             </Text>
 
-            {currentAngle !== null && (
+            {angle !== null && (
               <View style={styles.angleDisplay}>
                 <MaterialCommunityIcons name="angle-acute" size={24} color="#2196F3" />
                 <Text variant="titleLarge" style={styles.angleText}>
-                  {currentAngle.toFixed(1)}°
+                  {angle.toFixed(1)}°
                 </Text>
                 {isCalibrating && (
                   <Text variant="bodySmall" style={styles.calibratingText}>
@@ -270,7 +222,7 @@ export default function Settings() {
               <Button
                 mode="contained"
                 onPress={handleCalibrate}
-                disabled={isCalibrating || currentAngle === null || !ws}
+                disabled={isCalibrating || !isConnected}
                 buttonColor="#2196F3"
                 style={styles.button}
                 labelStyle={styles.buttonLabel}
