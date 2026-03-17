@@ -26,7 +26,7 @@ bool sistemaActivo = false;
 bool ultimoEstadoBoton = HIGH;
 
 float inclinacion = 0;
-float offsetAngulo = 0;
+float offsetAngulo = 15;
 
 float voltajeBateria = 0;
 int porcentajeBateria = 0;
@@ -141,9 +141,8 @@ void loop(){
     sistemaActivo = !sistemaActivo; // Toggle ON/OFF
 
     if(sistemaActivo){
-      sensors_event_t a,g,temp;
-      mpu.getEvent(&a,&g,&temp);
-      offsetAngulo = atan2(a.acceleration.z,-a.acceleration.y)*180/M_PI;
+      Serial.print("offset: ");
+      Serial.println(offsetAngulo);
       Serial.println(">>> SISTEMA ON <<<");
     }else{
       Serial.println(">>> SISTEMA OFF <<<");
