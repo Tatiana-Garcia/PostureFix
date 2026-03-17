@@ -9,6 +9,7 @@ export function useWebSocket() {
   const [angle, setAngle] = useState(0);
   const [isBadPosture, setIsBadPosture] = useState(false);
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [active, setActive] = useState(false);
 
   const connect = () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -30,6 +31,7 @@ export function useWebSocket() {
         if (typeof data.battery === "number") {
           setBatteryLevel(Math.max(0, Math.min(100, data.battery)));
         }
+        if (typeof data.active === "boolean") setActive(data.active);
 
       } catch {
         console.error("Invalid WS message:", event.data);
@@ -64,6 +66,7 @@ export function useWebSocket() {
     isConnected,
     angle,
     isBadPosture,
-    batteryLevel
+    batteryLevel,
+    active,
   };
 }

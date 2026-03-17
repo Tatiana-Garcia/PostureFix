@@ -25,7 +25,8 @@ export default function Index() {
     isConnected,
     angle,
     isBadPosture,
-    batteryLevel
+    batteryLevel,
+    active
   } = useWebSocket();
 
   console.log({
@@ -90,8 +91,21 @@ export default function Index() {
             <Text style={[styles.statusText, isConnected && styles.statusTextConnected]}>
               {isConnected ? "Conectado" : "Desconectado"}
             </Text>
+
+            <View style={[styles.statusBadge, active ? styles.statusActive : styles.statusInactive]}>
+              <MaterialCommunityIcons
+                name="power-plug"
+                size={14}
+                color={active ? "#4caf50" : "#f44336"}
+              />
+              <Text style={[styles.statusText, active ? styles.statusTextActive : styles.statusTextInactive]}>
+                {active ? "Activo" : "Inactivo"}
+              </Text>
+            </View>
           </View>
           <BatteryIndicator batteryLevel={batteryLevel} />
+
+
         </View>
       </View>
 
@@ -229,4 +243,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.5,
   },
+  statusActive: {
+  backgroundColor: "#e8f5e9",
+},
+statusInactive: {
+  backgroundColor: "#ffebee",
+},
+statusTextActive: {
+  color: "#4caf50",
+},
+statusTextInactive: {
+  color: "#f44336",
+},
 });
