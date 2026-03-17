@@ -29,7 +29,7 @@ export default function Settings() {
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const scale = useSharedValue(1);
   const successOpacity = useSharedValue(0);
-  const { connect, send, isConnected, angle } = useWebSocket();
+  const { connect, send, isConnected, angle, active } = useWebSocket();
   const collectedAnglesRef = useRef<number[]>([]);
 
 
@@ -240,7 +240,7 @@ setCollectedAngles([]);
               <Button
                 mode="contained"
                 onPress={handleCalibrate}
-                //disabled={isCalibrating || !isConnected}
+                disabled={!active}
                 buttonColor="#2196F3"
                 style={styles.button}
                 labelStyle={styles.buttonLabel}
