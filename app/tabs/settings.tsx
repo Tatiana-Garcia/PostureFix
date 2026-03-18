@@ -250,15 +250,7 @@ setCollectedAngles([]);
               </Button>
             </Animated.View>
 
-            {calibrationData && !isCalibrating && (
-              <Button
-                mode="outlined"
-                onPress={handleResetCalibration}
-                style={styles.resetButton}
-              >
-                Restablecer calibración
-              </Button>
-            )}
+            
             
             {calibrationData && !isCalibrating && (
               <Animated.View style={[styles.successContainer, animatedTextStyle]}>

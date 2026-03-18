@@ -26,7 +26,7 @@ bool sistemaActivo = false;
 bool ultimoEstadoBoton = HIGH;
 
 float inclinacion = 0;
-float offsetAngulo = 0;
+float offsetAngulo = 15;
 
 float voltajeBateria = 0;
 int porcentajeBateria = 0;
@@ -41,7 +41,14 @@ void cargarCalibracion(){
 }
 
 float leerVoltajeBateria(){
-  int raw = analogRead(PIN_BATERIA);
+  //int raw = analogRead(PIN_BATERIA);
+  int suma = 0;
+  for(int i = 0; i < 10; i++){
+    suma += analogRead(PIN_BATERIA);
+    delay(5);
+  }
+  int raw = suma / 10;
+  
   if(raw == 0) return 4.0; // simulación si no hay batería
   float volt = (raw / 4095.0) * 3.3;
   volt = volt * 2;
@@ -141,9 +148,8 @@ void loop(){
     sistemaActivo = !sistemaActivo; // Toggle ON/OFF
 
     if(sistemaActivo){
-      sensors_event_t a,g,temp;
-      mpu.getEvent(&a,&g,&temp);
-      offsetAngulo = atan2(a.acceleration.z,-a.acceleration.y)*180/M_PI;
+      Serial.print("offset: ");
+      Serial.println(offsetAngulo);
       Serial.println(">>> SISTEMA ON <<<");
     }else{
       Serial.println(">>> SISTEMA OFF <<<");
