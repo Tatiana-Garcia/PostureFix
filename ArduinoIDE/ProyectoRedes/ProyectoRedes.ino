@@ -41,7 +41,14 @@ void cargarCalibracion(){
 }
 
 float leerVoltajeBateria(){
-  int raw = analogRead(PIN_BATERIA);
+  //int raw = analogRead(PIN_BATERIA);
+  int suma = 0;
+  for(int i = 0; i < 10; i++){
+    suma += analogRead(PIN_BATERIA);
+    delay(5);
+  }
+  int raw = suma / 10;
+  
   if(raw == 0) return 4.0; // simulación si no hay batería
   float volt = (raw / 4095.0) * 3.3;
   volt = volt * 2;
